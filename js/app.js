@@ -1,8 +1,9 @@
-import { TASKS, PERSON_COLORS, PERSON_COLORS_SOFT, MAX_PEOPLE } from './tasks.js';
+import { PERSON_COLORS, PERSON_COLORS_SOFT, MAX_PEOPLE } from './tasks.js';
 import {
   state, DEFAULT_NAMES,
   visibleTasks, totals, totalPool, cumulative,
   resetAssignments, persist, load,
+  addTask, deleteTask,
 } from './state.js';
 import { computeProposal } from './balance.js';
 
@@ -165,15 +166,17 @@ function renderZones() {
       <div class="zone-head">
         <span class="zone-tag adentro">Adentro</span>
         <span class="zone-sum">${sumAdentro} pts en juego</span>
+        <button type="button" class="zone-header-btn" data-add-zone="adentro" title="Agregar nueva tarea adentro">+ Tarea adentro</button>
       </div>
-      ${adentro.map(renderTaskCard).join('')}
+      ${adentro.length ? adentro.map(renderTaskCard).join('') : '<p class="empty-hist" style="padding:8px 0">No hay tareas de adentro configuradas.</p>'}
     </div>
     <div class="zone">
       <div class="zone-head">
         <span class="zone-tag afuera">Afuera</span>
         <span class="zone-sum">${sumAfuera} pts en juego</span>
+        <button type="button" class="zone-header-btn" data-add-zone="afuera" title="Agregar nueva tarea afuera">+ Tarea afuera</button>
       </div>
-      ${afuera.map(renderTaskCard).join('')}
+      ${afuera.length ? afuera.map(renderTaskCard).join('') : '<p class="empty-hist" style="padding:8px 0">No hay tareas de afuera configuradas.</p>'}
     </div>`;
 }
 
@@ -224,13 +227,16 @@ function renderSettings() {
       <input type="text" class="settings-name-input" data-person-idx="${i}" value="${state.names[i]}" placeholder="${DEFAULT_NAMES[i]}" maxlength="16" aria-label="Nombre ${DEFAULT_NAMES[i]}">
     </div>`).join('');
 
-  const weightRows = TASKS.map(t => `
+  const weightRows = state.tasks.map(t => `
     <div class="weight-row">
       <div class="wlabel">
         ${t.name}
         <small>${t.zone === 'adentro' ? 'adentro' : 'afuera'} · ${t.kind === 'completa' ? 'completa' : 'genérica'}</small>
       </div>
-      <input type="number" min="0" step="1" data-weight="${t.id}" value="${state.weights[t.id] ?? 0}">
+      <div class="weight-row-right">
+        <input type="number" min="1" step="1" data-weight="${t.id}" value="${state.weights[t.id] ?? 2}" aria-label="Puntos de ${t.name}">
+        ${t.isCustom ? `<button type="button" class="btn-del-task" data-del-task="${t.id}" title="Eliminar tarea personalizada" aria-label="Eliminar tarea ${t.name}">✕</button>` : ''}
+      </div>
     </div>`).join('');
 
   return `
@@ -253,8 +259,41 @@ function renderSettings() {
         ${namesRows}
       </div>
 
-      <span class="settings-section-subtitle">Pesos de tareas</span>
-      ${weightRows}
+      <span class="settings-section-subtitle">Pesos de las tareas</span>
+      <div class="weights-list">
+        ${weightRows}
+      </div>
+
+      <!-- ── Formulario para agregar nueva tarea ── -->
+      <div class="add-task-box">
+        <span class="add-task-title">+ Agregar nueva tarea</span>
+        <input type="text" id="newTaskName" placeholder="Nombre de la tarea (ej: Lavar cortinas)..." maxlength="35" class="add-task-input">
+        
+        <div class="add-task-options">
+          <div class="option-group">
+            <label class="opt-label" for="newTaskZone">Zona</label>
+            <select id="newTaskZone" class="add-task-select">
+              <option value="adentro">Adentro</option>
+              <option value="afuera">Afuera</option>
+            </select>
+          </div>
+
+          <div class="option-group">
+            <label class="opt-label" for="newTaskKind">Frecuencia</label>
+            <select id="newTaskKind" class="add-task-select">
+              <option value="generica">Genérica (cada finde)</option>
+              <option value="completa">Completa (extra)</option>
+            </select>
+          </div>
+
+          <div class="option-group">
+            <label class="opt-label" for="newTaskWeight">Puntos</label>
+            <input type="number" id="newTaskWeight" value="2" min="1" max="20" class="add-task-weight">
+          </div>
+        </div>
+
+        <button type="button" id="addNewTaskBtn" class="btn-add-task">+ Guardar nueva tarea</button>
+      </div>
     </div>`;
 }
 
@@ -488,6 +527,63 @@ function attachListeners() {
       // Toggle off if already assigned to same person
       state.assign[taskId] = (state.assign[taskId] === val) ? -1 : val;
       render();
+    };
+  });
+
+  // Add new task form submission
+  const addBtn = document.getElementById('addNewTaskBtn');
+  if (addBtn) {
+    addBtn.onclick = () => {
+      const nameInp   = document.getElementById('newTaskName');
+      const zoneSel   = document.getElementById('newTaskZone');
+      const kindSel   = document.getElementById('newTaskKind');
+      const weightInp = document.getElementById('newTaskWeight');
+      if (!nameInp || !nameInp.value.trim()) {
+        if (nameInp) nameInp.focus();
+        return;
+      }
+      addTask({
+        name:   nameInp.value,
+        zone:   zoneSel ? zoneSel.value : 'adentro',
+        kind:   kindSel ? kindSel.value : 'generica',
+        weight: Number(weightInp ? weightInp.value : 2) || 2,
+      });
+      render();
+    };
+  }
+
+  const nameInputEl = document.getElementById('newTaskName');
+  if (nameInputEl) {
+    nameInputEl.onkeydown = e => {
+      if (e.key === 'Enter') {
+        const btn = document.getElementById('addNewTaskBtn');
+        if (btn) btn.click();
+      }
+    };
+  }
+
+  // Delete custom task buttons
+  app.querySelectorAll('[data-del-task]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute('data-del-task');
+      deleteTask(id);
+      render();
+    };
+  });
+
+  // Shortcut "+ Tarea adentro" / "+ Tarea afuera" buttons in zone headers
+  app.querySelectorAll('[data-add-zone]').forEach(btn => {
+    btn.onclick = () => {
+      const targetZone = btn.getAttribute('data-add-zone');
+      state.settingsOpen = true;
+      render();
+      const zoneSel = document.getElementById('newTaskZone');
+      if (zoneSel) zoneSel.value = targetZone;
+      const inp = document.getElementById('newTaskName');
+      if (inp) {
+        inp.focus();
+        inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     };
   });
 

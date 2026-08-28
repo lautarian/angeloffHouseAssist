@@ -1,5 +1,5 @@
 // ─── Definición de tareas ────────────────────────────────────────────────────
-export const TASKS = [
+export const DEFAULT_TASKS = [
   { id: 'adentro_orden', name: 'Adentro de la casa + orden', zone: 'adentro', kind: 'generica'  },
   { id: 'baño',          name: 'El baño',                    zone: 'adentro', kind: 'generica'  },
   { id: 'muebles',       name: 'Los muebles (sin piezas)',   zone: 'adentro', kind: 'completa'  },
@@ -9,6 +9,8 @@ export const TASKS = [
   { id: 'cocina',        name: 'La cocina',                  zone: 'afuera',  kind: 'completa'  },
   { id: 'pasto',         name: 'Cortar el pasto',            zone: 'afuera',  kind: 'completa'  },
 ];
+
+export const TASKS = DEFAULT_TASKS;
 
 export const DEFAULT_WEIGHTS = {
   adentro_orden: 6,
