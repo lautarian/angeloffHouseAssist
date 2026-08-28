@@ -1,9 +1,10 @@
 import { PERSON_COLORS, PERSON_COLORS_SOFT, MAX_PEOPLE } from './tasks.js';
 import {
   state, DEFAULT_NAMES,
-  visibleTasks, totals, totalPool, cumulative,
+  visibleTasks, activeTasks, silencedTasks, silencedPool,
+  totals, totalPool, cumulative,
   resetAssignments, persist, load,
-  addTask, deleteTask,
+  addTask, deleteTask, toggleSilenceTask,
 } from './state.js';
 import { computeProposal } from './balance.js';
 
@@ -85,10 +86,16 @@ function renderBalance() {
   const inner = state.numPeople === 2 ? renderBeam2(t) : renderBars(t);
 
   const missing = pool - vis;
+  const sTasks  = silencedTasks();
+  const sPts    = silencedPool();
+
   let statusLine = pool
     ? `pool de este finde: <b>${pool} pts</b> · objetivo ${(pool / state.numPeople).toFixed(1)} c/u`
-    : 'sin tareas visibles';
+    : 'sin tareas activas este finde';
   if (missing > 0 && pool > 0) statusLine += ` · faltan ${missing} pts por asignar`;
+  if (sTasks.length > 0) {
+    statusLine += ` · <span class="silenced-status-note">${sTasks.length} tarea${sTasks.length > 1 ? 's' : ''} omitida${sTasks.length > 1 ? 's' : ''} (${sPts} pts)</span>`;
+  }
 
   return `
     <div class="balance-wrap">
@@ -101,7 +108,7 @@ function renderBalance() {
 function renderProposal() {
   if (!state.proposal) return '';
   const { assign, totals: propTotals } = state.proposal;
-  const vt = visibleTasks();
+  const vt = activeTasks();
 
   const persons = Array.from({ length: state.numPeople }, (_, i) => {
     const myTasks = vt.filter(t => assign[t.id] === i).map(t => t.name);
@@ -133,23 +140,50 @@ function renderProposal() {
 // ─── Subrender: a single task card ────────────────────────────────────────────
 function renderTaskCard(task) {
   const w = state.weights[task.id] ?? 0;
+  const isSilenced = Boolean(state.silenced && state.silenced[task.id]);
+
   // When a proposal is active, show proposal assignment; else current
   const sourceAssign = state.proposal ? state.proposal.assign : state.assign;
   const a = sourceAssign[task.id] ?? -1;
 
   const assignBtns = Array.from({ length: state.numPeople }, (_, i) => `
     <button
-      class="assign-btn ${a === i ? `active-${i}` : ''}"
+      class="assign-btn ${a === i && !isSilenced ? `active-${i}` : ''}"
       data-task="${task.id}"
       data-val="${i}"
-      ${state.proposal ? 'disabled' : ''}
+      ${state.proposal || isSilenced ? 'disabled' : ''}
     >${state.names[i]}</button>`).join('');
 
   return `
-    <div class="task-card ${task.kind === 'completa' ? 'is-completa' : ''} ${state.proposal && a >= 0 ? 'proposed' : ''}">
-      <div class="task-name">${task.name}</div>
-      <div class="task-weight">${w} pt${w === 1 ? '' : 's'}</div>
-      <div class="assign-group">${assignBtns}</div>
+    <div class="task-card ${task.kind === 'completa' ? 'is-completa' : ''} ${state.proposal && a >= 0 ? 'proposed' : ''} ${isSilenced ? 'is-silenced' : ''}">
+      <button
+        type="button"
+        class="btn-silence-task ${isSilenced ? 'silenced' : ''}"
+        data-toggle-silence="${task.id}"
+        title="${isSilenced ? 'Reactivar esta tarea para este finde' : 'Tachar u omitir esta tarea este finde'}"
+        aria-label="${isSilenced ? 'Reactivar' : 'Omitir'} tarea ${task.name}"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          ${isSilenced 
+            ? '<path d="M1 1l22 22M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>' 
+            : '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>'
+          }
+        </svg>
+        <span class="silence-text">${isSilenced ? 'Omitida' : 'Omitir'}</span>
+      </button>
+
+      <div class="task-name ${isSilenced ? 'task-name-silenced' : ''}">
+        ${task.name}
+        ${isSilenced ? '<span class="silenced-tag">no cuenta este finde</span>' : ''}
+      </div>
+
+      <div class="task-weight ${isSilenced ? 'task-weight-silenced' : ''}">
+        ${isSilenced ? `<del>${w} pt${w === 1 ? '' : 's'}</del>` : `${w} pt${w === 1 ? '' : 's'}`}
+      </div>
+
+      <div class="assign-group ${isSilenced ? 'assign-group-disabled' : ''}">
+        ${assignBtns}
+      </div>
     </div>`;
 }
 
@@ -158,14 +192,21 @@ function renderZones() {
   const vt         = visibleTasks();
   const adentro    = vt.filter(t => t.zone === 'adentro');
   const afuera     = vt.filter(t => t.zone === 'afuera');
-  const sumAdentro = adentro.reduce((s, t) => s + (Number(state.weights[t.id]) || 0), 0);
-  const sumAfuera  = afuera.reduce((s,  t) => s + (Number(state.weights[t.id]) || 0), 0);
+
+  const activeAdentro = adentro.filter(t => !state.silenced[t.id]);
+  const activeAfuera  = afuera.filter(t => !state.silenced[t.id]);
+
+  const sumAdentro = activeAdentro.reduce((s, t) => s + (Number(state.weights[t.id]) || 0), 0);
+  const sumAfuera  = activeAfuera.reduce((s,  t) => s + (Number(state.weights[t.id]) || 0), 0);
+
+  const omittedAdentro = adentro.filter(t => state.silenced[t.id]).length;
+  const omittedAfuera  = afuera.filter(t => state.silenced[t.id]).length;
 
   return `
     <div class="zone">
       <div class="zone-head">
         <span class="zone-tag adentro">Adentro</span>
-        <span class="zone-sum">${sumAdentro} pts en juego</span>
+        <span class="zone-sum">${sumAdentro} pts en juego${omittedAdentro ? ` · (${omittedAdentro} omitida${omittedAdentro > 1 ? 's' : ''})` : ''}</span>
         <button type="button" class="zone-header-btn" data-add-zone="adentro" title="Agregar nueva tarea adentro">+ Tarea adentro</button>
       </div>
       ${adentro.length ? adentro.map(renderTaskCard).join('') : '<p class="empty-hist" style="padding:8px 0">No hay tareas de adentro configuradas.</p>'}
@@ -173,7 +214,7 @@ function renderZones() {
     <div class="zone">
       <div class="zone-head">
         <span class="zone-tag afuera">Afuera</span>
-        <span class="zone-sum">${sumAfuera} pts en juego</span>
+        <span class="zone-sum">${sumAfuera} pts en juego${omittedAfuera ? ` · (${omittedAfuera} omitida${omittedAfuera > 1 ? 's' : ''})` : ''}</span>
         <button type="button" class="zone-header-btn" data-add-zone="afuera" title="Agregar nueva tarea afuera">+ Tarea afuera</button>
       </div>
       ${afuera.length ? afuera.map(renderTaskCard).join('') : '<p class="empty-hist" style="padding:8px 0">No hay tareas de afuera configuradas.</p>'}
@@ -587,6 +628,15 @@ function attachListeners() {
     };
   });
 
+  // Toggle silence / omit task for this weekend
+  app.querySelectorAll('[data-toggle-silence]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute('data-toggle-silence');
+      toggleSilenceTask(id);
+      render();
+    };
+  });
+
   // History delete buttons
   app.querySelectorAll('[data-del]').forEach(btn => {
     btn.onclick = () => {
@@ -633,6 +683,9 @@ function saveSession() {
     names:    [...state.names],
   });
   state.history = state.history.slice(0, 30);
+
+  // Reiniciar excepciones para el próximo finde
+  state.silenced = {};
 
   persist();
   resetAssignments();

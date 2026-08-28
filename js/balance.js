@@ -1,16 +1,15 @@
-import { state, visibleTasks, cumulative, totals } from './state.js';
+import { state, activeTasks, cumulative, totals } from './state.js';
 
 /**
  * Calcula la distribución óptima de tareas entre N personas.
  * Enumera todas las combinaciones posibles (N^T) y elige la que
  * minimiza la varianza del acumulado histórico + puntos de este finde.
- *
- * Complejidad: O(N^T) — para N=5, T=8: 390,625 → aceptable en runtime.
+ * Solo considera las tareas activas (excluye las omitidas/silenciadas).
  *
  * @returns {{ assign: Object, totals: number[] } | null}
  */
 export function computeProposal() {
-  const tasks = visibleTasks();
+  const tasks = activeTasks();
   const n     = state.numPeople;
   const T     = tasks.length;
   if (T === 0) return null;

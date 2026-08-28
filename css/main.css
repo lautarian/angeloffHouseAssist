@@ -844,7 +844,65 @@ h1 {
 /* Glow when task is in proposal mode */
 .task-card.proposed { border-color: var(--completa); }
 
+/* Silenced / Omitted task card */
+.task-card.is-silenced {
+  background: #F1F5F9;
+  border-color: #D6E0EA;
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.btn-silence-task {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 7px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  transition: all .15s;
+}
+
+.btn-silence-task:hover {
+  border-color: #C0392B;
+  color: #C0392B;
+  background: #FDEDEC;
+}
+
+.btn-silence-task.silenced {
+  background: #FDEDEC;
+  border-color: #E6B0AA;
+  color: #C0392B;
+  font-weight: 600;
+}
+
+.btn-silence-task.silenced:hover {
+  background: #FADBD8;
+}
+
 .task-name { flex: 1; font-size: 14px; font-weight: 500; line-height: 1.3; }
+
+.task-name.task-name-silenced {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.silenced-tag {
+  display: block;
+  font-size: 10px;
+  color: #C0392B;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: .02em;
+  text-decoration: none;
+  font-weight: 500;
+  margin-top: 1px;
+}
 
 .task-weight {
   font-family: 'IBM Plex Mono', monospace;
@@ -854,6 +912,15 @@ h1 {
   border-radius: var(--radius-sm);
   padding: 3px 8px;
   flex: none;
+}
+
+.task-weight.task-weight-silenced {
+  opacity: 0.6;
+}
+
+.silenced-status-note {
+  color: #B88008;
+  font-weight: 600;
 }
 
 /* assign buttons */
