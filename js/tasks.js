@@ -21,21 +21,22 @@ export const DEFAULT_WEIGHTS = {
   pasto:         2,
 };
 
-// ─── Paleta de colores para hasta 5 personas ─────────────────────────────────
+// ─── Paleta de colores sutil estilo boquense (azul y oro refinados) ──────────
 export const MAX_PEOPLE = 5;
 
 export const PERSON_COLORS = [
-  '#2D5A40', // 0 · verde bosque
-  '#8B3A1E', // 1 · terracota
-  '#2E4B8B', // 2 · azul indigo
-  '#7B3F8B', // 3 · violeta
-  '#8B6B1E', // 4 · dorado
+  '#133863', // 0 · Azul Xeneize profundo
+  '#B88008', // 1 · Oro cálido refinado
+  '#1E4C7C', // 2 · Azul marino acero
+  '#9E6E0C', // 3 · Ámbar dorado
+  '#2C5D88', // 4 · Azul noche intermedio
 ];
 
 export const PERSON_COLORS_SOFT = [
-  '#DFF0E6',
-  '#F5DDD5',
-  '#D5E0F5',
-  '#EDD5F5',
-  '#F5EDD5',
+  '#E3EDF8', // 0 · azul suave
+  '#FBF2DC', // 1 · oro suave
+  '#E5EFF9', // 2 · azul acero suave
+  '#F8EED8', // 3 · ámbar suave
+  '#E7F0FA', // 4 · azul noche suave
 ];
+

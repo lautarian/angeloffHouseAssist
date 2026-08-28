@@ -22,7 +22,8 @@ function pColorSoft(i) { return PERSON_COLORS_SOFT[i] ?? PERSON_COLORS_SOFT[0]; 
 function beamAngle() {
   const t    = totals();
   const pool = totalPool() || 1;
-  const diff = t[0] - t[1];
+  // Físicamente: el lado con más puntos pesa más y debe bajar (+angle baja derecha, -angle baja izquierda)
+  const diff = t[1] - t[0];
   return Math.max(-14, Math.min(14, (diff / pool) * 28));
 }
 
@@ -217,6 +218,12 @@ function renderHistory() {
 
 // ─── Subrender: settings panel ────────────────────────────────────────────────
 function renderSettings() {
+  const namesRows = Array.from({ length: state.numPeople }, (_, i) => `
+    <div class="name-setting-row">
+      <span class="dot" style="background:${pColor(i)}"></span>
+      <input type="text" class="settings-name-input" data-person-idx="${i}" value="${state.names[i]}" placeholder="${DEFAULT_NAMES[i]}" maxlength="16" aria-label="Nombre ${DEFAULT_NAMES[i]}">
+    </div>`).join('');
+
   const weightRows = TASKS.map(t => `
     <div class="weight-row">
       <div class="wlabel">
@@ -240,7 +247,13 @@ function renderSettings() {
           <button id="peopleUp"   ${state.numPeople >= MAX_PEOPLE ? 'disabled' : ''} aria-label="Aumentar personas">+</button>
         </div>
       </div>
-      <h3>Pesos de tareas</h3>
+
+      <span class="settings-section-subtitle">Nombres de los integrantes</span>
+      <div class="names-settings-list">
+        ${namesRows}
+      </div>
+
+      <span class="settings-section-subtitle">Pesos de tareas</span>
       ${weightRows}
     </div>`;
 }
@@ -248,9 +261,12 @@ function renderSettings() {
 // ─── Main render ──────────────────────────────────────────────────────────────
 function render() {
   const nameChips = Array.from({ length: state.numPeople }, (_, i) => `
-    <div class="name-chip">
+    <div class="name-chip" data-chip-idx="${i}" title="Click para cambiar nombre">
       <span class="dot" style="background:${pColor(i)}"></span>
-      <input id="name${i}" value="${state.names[i]}" maxlength="16" placeholder="Nombre" aria-label="Nombre persona ${i + 1}">
+      <input id="name${i}" class="chip-name-input" data-idx="${i}" value="${state.names[i]}" maxlength="16" placeholder="${DEFAULT_NAMES[i]}" aria-label="Nombre integrante ${i + 1}">
+      <svg class="chip-edit-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+      </svg>
     </div>`).join('');
 
   app.innerHTML = `
@@ -375,19 +391,77 @@ function attachListeners() {
   // Save session
   document.getElementById('saveBtn').onclick = saveSession;
 
-  // Name inputs (debounced)
-  const debouncedPersist = debounce(() => persist(), 600);
+  // Synchronize name changes in real time across the entire UI
+  const debouncedPersist = debounce(() => persist(), 400);
+
+  function syncName(idx, newRawValue, isFinal = false) {
+    const trimmed = newRawValue.trim();
+    state.names[idx] = trimmed || (isFinal ? DEFAULT_NAMES[idx] : newRawValue);
+
+    const displayName = trimmed || (isFinal ? DEFAULT_NAMES[idx] : DEFAULT_NAMES[idx]);
+
+    // Keep top chip and settings inputs in sync
+    const chipInp = document.getElementById(`name${idx}`);
+    if (chipInp && chipInp !== document.activeElement) {
+      chipInp.value = state.names[idx];
+    }
+    const setInp = document.querySelector(`.settings-name-input[data-person-idx="${idx}"]`);
+    if (setInp && setInp !== document.activeElement) {
+      setInp.value = state.names[idx];
+    }
+
+    if (isFinal) {
+      if (chipInp && !chipInp.value.trim()) chipInp.value = DEFAULT_NAMES[idx];
+      if (setInp && !setInp.value.trim()) setInp.value = DEFAULT_NAMES[idx];
+    }
+
+    // Immediately update all task assignment buttons in the page
+    document.querySelectorAll(`.assign-btn[data-val="${idx}"]`).forEach(btn => {
+      btn.textContent = displayName;
+    });
+    // Immediately update beam labels (2 people)
+    const beamLabels = document.querySelectorAll('.beam-nums .side .lbl');
+    if (beamLabels[idx]) beamLabels[idx].textContent = displayName;
+    // Immediately update bar labels (3+ people)
+    const barLabels = document.querySelectorAll('.bar-label');
+    if (barLabels[idx]) barLabels[idx].textContent = displayName;
+    // Immediately update proposal card names if open
+    const propNames = document.querySelectorAll('.proposal-person .pp-name');
+    if (propNames[idx]) propNames[idx].textContent = displayName;
+
+    debouncedPersist();
+    if (isFinal) {
+      persist();
+    }
+  }
+
+  // Click on chip pill focuses input
+  app.querySelectorAll('.name-chip').forEach(chip => {
+    chip.onclick = e => {
+      const inp = chip.querySelector('input');
+      if (inp && e.target !== inp) inp.focus();
+    };
+  });
+
+  // Top chip name inputs
   Array.from({ length: state.numPeople }, (_, i) => {
     const inp = document.getElementById(`name${i}`);
     if (!inp) return;
-    inp.oninput = e => {
-      state.names[i] = e.target.value || DEFAULT_NAMES[i];
-      debouncedPersist();
-      // Re-render only beam/bars labels without full re-render to avoid focus loss
-      const numEls = document.querySelectorAll('.beam-nums .lbl, .bar-label');
-      // Just do a soft label update if possible — for simplicity, skip full render on input
+    inp.oninput = e => syncName(i, e.target.value, false);
+    inp.onkeydown = e => {
+      if (e.key === 'Enter') inp.blur();
     };
-    inp.onblur = () => { persist(); render(); };
+    inp.onblur = () => syncName(i, inp.value, true);
+  });
+
+  // Settings panel name inputs
+  app.querySelectorAll('.settings-name-input').forEach(inp => {
+    const idx = Number(inp.getAttribute('data-person-idx'));
+    inp.oninput = e => syncName(idx, e.target.value, false);
+    inp.onkeydown = e => {
+      if (e.key === 'Enter') inp.blur();
+    };
+    inp.onblur = () => syncName(idx, inp.value, true);
   });
 
   // People stepper
