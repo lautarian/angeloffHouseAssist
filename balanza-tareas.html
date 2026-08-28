@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Balanza — Reparto de tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EDEAE0;
+    --paper:#F7F4EC;
+    --ink:#1F2E28;
+    --ink-soft:#5B6960;
+    --adentro:#3C6E52;
+    --adentro-soft:#E4EEE7;
+    --afuera:#B85C38;
+    --afuera-soft:#F5E6DD;
+    --completa:#C99A2E;
+    --completa-soft:#F7EDD3;
+    --line:#D9D3C2;
+    --white:#FFFFFF;
+    --p0:#3C6E52;
+    --p1:#B85C38;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:720px;
+    margin:0 auto;
+    padding:28px 18px 60px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:900;
+    font-size:38px;
+    line-height:1.02;
+    margin:0 0 8px;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    color:var(--ink-soft);
+    font-size:14.5px;
+    line-height:1.5;
+    margin:0 0 22px;
+    max-width:52ch;
+  }
+
+  /* ---- top bar: names + settings ---- */
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .names{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .name-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:5px 12px 5px 10px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .name-chip .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .name-chip input{
+    border:none;background:transparent;font:inherit;font-weight:600;
+    width:auto; min-width:2ch; max-width:14ch; color:var(--ink);
+    padding:0;
+  }
+  .name-chip input:focus{outline:none; border-bottom:1px solid var(--ink-soft);}
+  .gear{
+    border:1px solid var(--line);
+    background:var(--paper);
+    border-radius:999px;
+    width:34px;height:34px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    color:var(--ink-soft);
+    flex:none;
+  }
+  .gear:hover{color:var(--ink);}
+
+  /* ---- settings panel ---- */
+  .settings{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:20px;
+    display:none;
+  }
+  .settings.open{display:block;}
+  .settings h3{
+    font-family:'Fraunces',serif;
+    font-size:16px;
+    margin:0 0 10px;
+  }
+  .weight-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+  }
+  .weight-row:last-child{border-bottom:none;}
+  .weight-row input{
+    width:52px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    text-align:center;
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:4px 2px;
+    background:var(--white);
+  }
+
+  /* ---- toggle: completa ---- */
+  .completa-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--completa-soft);
+    border:1px solid var(--completa);
+    border-radius:14px;
+    padding:13px 16px;
+    margin-bottom:20px;
+  }
+  .completa-toggle .label{font-size:14px;font-weight:600;}
+  .completa-toggle .label small{
+    display:block;font-weight:400;color:var(--ink-soft);font-size:12px;margin-top:2px;
+  }
+  .switch{
+    position:relative;width:44px;height:26px;flex:none;cursor:pointer;
+  }
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}
+  .switch .track{
+    position:absolute;inset:0;background:#D8D0BC;border-radius:999px;transition:background .18s;
+  }
+  .switch .knob{
+    position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:var(--white);transition:transform .18s; box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .track{background:var(--completa);}
+  .switch input:checked + .track + .knob{transform:translateX(18px);}
+
+  /* ---- balance beam (signature element) ---- */
+  .beam-wrap{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:22px 20px 16px;
+    margin-bottom:22px;
+  }
+  .beam-svg{width:100%;height:auto;display:block;}
+  .beam-pivot{transform-origin:170px 60px; transition:transform .35s cubic-bezier(.34,1.4,.64,1);}
+  .beam-nums{
+    display:flex;justify-content:space-between;margin-top:6px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .beam-nums .side{text-align:center;flex:1;}
+  .beam-nums .side .n{font-size:24px;font-weight:600;}
+  .beam-nums .side .lbl{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .beam-status{
+    text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:10px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  /* ---- zone groups ---- */
+  .zone{margin-bottom:18px;}
+  .zone-head{
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  }
+  .zone-head .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px;font-weight:600;
+  }
+  .zone-head.adentro .tag{background:var(--adentro-soft);color:var(--adentro);}
+  .zone-head.afuera .tag{background:var(--afuera-soft);color:var(--afuera);}
+  .zone-head .zsum{font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+
+  .task{
+    display:flex;align-items:center;gap:10px;
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 12px;
+    margin-bottom:7px;
+  }
+  .task.completa-tag{border-left:3px solid var(--completa);}
+  .task .tname{flex:1;font-size:14px;font-weight:500;}
+  .task .tw{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;color:var(--ink-soft);
+    background:var(--bg);border-radius:7px;padding:3px 7px;flex:none;
+  }
+  .assign{
+    display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none;
+  }
+  .assign button{
+    border:none;background:var(--white);padding:6px 11px;font-size:12px;font-weight:600;
+    cursor:pointer;color:var(--ink-soft);font-family:'Inter',sans-serif;
+    border-right:1px solid var(--line);
+  }
+  .assign button:last-child{border-right:none;}
+  .assign button.active-0{background:var(--adentro);color:var(--white);}
+  .assign button.active-1{background:var(--afuera);color:var(--white);}
+
+  /* ---- actions ---- */
+  .actions{
+    display:flex;gap:10px;margin:22px 0 10px;flex-wrap:wrap;
+  }
+  .btn{
+    flex:1;min-width:150px;
+    border:none;border-radius:12px;padding:13px 14px;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--ink);color:var(--white);}
+  .btn-ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+  .btn:active{transform:translateY(1px);}
+
+  /* ---- history ---- */
+  .history{
+    margin-top:26px;border-top:1px solid var(--line);padding-top:16px;
+  }
+  .history h3{
+    font-family:'Fraunces',serif;font-size:17px;margin:0 0 4px;
+  }
+  .history .cum{
+    display:flex;gap:16px;margin:10px 0 14px;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+  }
+  .history .cum span b{display:block;font-size:19px;}
+  .hist-row{
+    display:flex;justify-content:space-between;font-size:12.5px;
+    padding:7px 0;border-bottom:1px solid var(--line);color:var(--ink-soft);
+  }
+  .hist-row:last-child{border-bottom:none;}
+  .hist-row b{color:var(--ink);font-weight:600;}
+  .empty-hist{font-size:13px;color:var(--ink-soft);font-style:italic;}
+
+  .status-line{
+    font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:14px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  @media (max-width:420px){
+    h1{font-size:30px;}
+    .assign button{padding:6px 8px;font-size:11px;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">Cargando…</div>
+
+<script>
+(function(){
+
+const TASKS = [
+  {id:'adentro_orden', name:'Adentro de la casa + orden', zone:'adentro', kind:'generica'},
+  {id:'baño',           name:'El baño',                     zone:'adentro', kind:'generica'},
+  {id:'muebles',         name:'Los muebles (sin piezas)',    zone:'adentro', kind:'completa'},
+  {id:'galeria',         name:'La galería',                  zone:'afuera',  kind:'generica'},
+  {id:'patio',           name:'El patio',                    zone:'afuera',  kind:'generica'},
+  {id:'terraza',         name:'La terraza',                  zone:'afuera',  kind:'completa'},
+  {id:'cocina',          name:'La cocina',                    zone:'afuera',  kind:'completa'},
+  {id:'pasto',           name:'Cortar el pasto',              zone:'afuera',  kind:'completa'},
+];
+
+const DEFAULT_WEIGHTS = {
+  adentro_orden:6, baño:4, muebles:2, galeria:4, patio:2, terraza:3, cocina:2, pasto:2
+};
+const DEFAULT_NAMES = ['Hermano 1','Hermano 2'];
+
+let state = {
+  weights: {...DEFAULT_WEIGHTS},
+  names: [...DEFAULT_NAMES],
+  isCompleta: false,
+  assign: {},        // taskId -> -1 (sin asignar) | 0 | 1
+  history: [],        // {date, completa, totals:[a,b], names:[..]}
+  settingsOpen: false,
+  loaded: false,
+};
+
+TASKS.forEach(t => state.assign[t.id] = -1);
+
+const app = document.getElementById('app');
+
+function visibleTasks(){
+  return TASKS.filter(t => t.kind === 'generica' || (state.isCompleta && t.kind === 'completa'));
+}
+
+function totals(){
+  const t = [0,0];
+  visibleTasks().forEach(task=>{
+    const a = state.assign[task.id];
+    if(a===0 || a===1) t[a] += Number(state.weights[task.id])||0;
+  });
+  return t;
+}
+
+function totalPool(){
+  return visibleTasks().reduce((s,t)=> s + (Number(state.weights[t.id])||0), 0);
+}
+
+function cumulative(){
+  const c=[0,0];
+  state.history.forEach(h=>{ c[0]+=h.totals[0]; c[1]+=h.totals[1]; });
+  return c;
+}
+
+function autoBalance(){
+  const tasks = visibleTasks();
+  const n = tasks.length;
+  if(n===0) return;
+  const cum = cumulative();
+  // bias: start from cumulative gap so this session compensates history
+  const bias = cum[0]-cum[1];
+  let best=null, bestDiff=Infinity;
+  const lim = 1<<n;
+  for(let mask=0; mask<lim; mask++){
+    let s0=0,s1=0;
+    for(let i=0;i<n;i++){
+      const w = Number(state.weights[tasks[i].id])||0;
+      if(mask & (1<<i)) s0+=w; else s1+=w;
+    }
+    const diff = Math.abs((s0+bias)-s1);
+    if(diff<bestDiff){ bestDiff=diff; best=mask; }
+  }
+  tasks.forEach((t,i)=>{ state.assign[t.id] = (best & (1<<i)) ? 0 : 1; });
+  render();
+}
+
+function resetAssignments(){
+  TASKS.forEach(t=> state.assign[t.id] = -1);
+  render();
+}
+
+function saveSession(){
+  const t = totals();
+  if(t[0]===0 && t[1]===0){ return; }
+  state.history.unshift({
+    date: new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'short'}),
+    completa: state.isCompleta,
+    totals: t,
+    names: [...state.names],
+  });
+  state.history = state.history.slice(0,25);
+  persist();
+  resetAssignments();
+}
+
+async function persist(){
+  try{
+    await window.storage.set('config', JSON.stringify({weights:state.weights, names:state.names}), false);
+    await window.storage.set('history', JSON.stringify(state.history), false);
+  }catch(e){ console.error('storage error', e); }
+}
+
+async function load(){
+  try{
+    const cfg = await window.storage.get('config', false);
+    if(cfg && cfg.value){
+      const parsed = JSON.parse(cfg.value);
+      if(parsed.weights) state.weights = {...DEFAULT_WEIGHTS, ...parsed.weights};
+      if(parsed.names) state.names = parsed.names;
+    }
+  }catch(e){ /* no config yet */ }
+  try{
+    const hist = await window.storage.get('history', false);
+    if(hist && hist.value){ state.history = JSON.parse(hist.value); }
+  }catch(e){ /* no history yet */ }
+  state.loaded = true;
+  render();
+}
+
+function setAssign(taskId, val){
+  state.assign[taskId] = (state.assign[taskId]===val) ? -1 : val;
+  render();
+}
+
+function beamAngle(){
+  const t = totals();
+  const pool = totalPool() || 1;
+  const diff = t[0]-t[1];
+  const angle = Math.max(-14, Math.min(14, (diff/pool)*28));
+  return angle;
+}
+
+function render(){
+  const t = totals();
+  const pool = totalPool();
+  const angle = beamAngle();
+  const cum = cumulative();
+  const vt = visibleTasks();
+
+  const adentroTasks = vt.filter(x=>x.zone==='adentro');
+  const afueraTasks = vt.filter(x=>x.zone==='afuera');
+  const adentroSum = adentroTasks.reduce((s,x)=>s+(Number(state.weights[x.id])||0),0);
+  const afueraSum = afueraTasks.reduce((s,x)=>s+(Number(state.weights[x.id])||0),0);
+
+  function taskRow(task){
+    const w = state.weights[task.id];
+    const a = state.assign[task.id];
+    return `
+      <div class="task ${task.kind==='completa'?'completa-tag':''}">
+        <div class="tname">${task.name}</div>
+        <div class="tw">${w} pt${w==1?'':'s'}</div>
+        <div class="assign">
+          <button data-task="${task.id}" data-val="0" class="${a===0?'active-0':''}">${state.names[0]}</button>
+          <button data-task="${task.id}" data-val="1" class="${a===1?'active-1':''}">${state.names[1]}</button>
+        </div>
+      </div>`;
+  }
+
+  app.innerHTML = `
+    <p class="eyebrow">Sistema de ponderación · casa</p>
+    <h1>La Balanza</h1>
+    <p class="sub">Elijan tareas para este finde. El sistema suma los puntos y muestra si el reparto quedó equilibrado — y recuerda el historial para compensar en los próximos findes.</p>
+
+    <div class="topbar">
+      <div class="names">
+        <div class="name-chip"><span class="dot" style="background:var(--p0)"></span><input id="name0" value="${state.names[0]}" maxlength="16"></div>
+        <div class="name-chip"><span class="dot" style="background:var(--p1)"></span><input id="name1" value="${state.names[1]}" maxlength="16"></div>
+      </div>
+      <div class="gear" id="gearBtn" title="Editar pesos">⚙</div>
+    </div>
+
+    <div class="settings ${state.settingsOpen?'open':''}" id="settingsPanel">
+      <h3>Pesos de cada tarea</h3>
+      ${TASKS.map(t=>`
+        <div class="weight-row">
+          <span>${t.name} <span style="color:var(--ink-soft)">(${t.zone}, ${t.kind==='completa'?'completa':'genérica'})</span></span>
+          <input type="number" min="0" step="1" data-weight="${t.id}" value="${state.weights[t.id]}">
+        </div>`).join('')}
+    </div>
+
+    <div class="completa-toggle">
+      <div class="label">Finde de limpieza completa
+        <small>Suma las 4 tareas extra: muebles, terraza, cocina, pasto</small>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="completaSwitch" ${state.isCompleta?'checked':''}>
+        <span class="track"></span><span class="knob"></span>
+      </label>
+    </div>
+
+    <div class="beam-wrap">
+      <svg class="beam-svg" viewBox="0 0 340 130">
+        <line x1="170" y1="60" x2="170" y2="112" stroke="var(--ink-soft)" stroke-width="3"/>
+        <circle cx="170" cy="112" r="4" fill="var(--ink-soft)"/>
+        <g class="beam-pivot" style="transform:rotate(${angle}deg)">
+          <line x1="30" y1="60" x2="310" y2="60" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>
+          <line x1="55" y1="60" x2="55" y2="86" stroke="var(--p0)" stroke-width="3"/>
+          <line x1="285" y1="60" x2="285" y2="86" stroke="var(--p1)" stroke-width="3"/>
+          <path d="M 30 86 Q 55 100 80 86 Z" fill="var(--adentro-soft)" stroke="var(--p0)" stroke-width="2"/>
+          <path d="M 260 86 Q 285 100 310 86 Z" fill="var(--afuera-soft)" stroke="var(--p1)" stroke-width="2"/>
+        </g>
+        <circle cx="170" cy="60" r="6" fill="var(--ink)"/>
+      </svg>
+      <div class="beam-nums">
+        <div class="side"><div class="n" style="color:var(--p0)">${t[0]}</div><div class="lbl">${state.names[0]}</div></div>
+        <div class="side"><div class="n" style="color:var(--p1)">${t[1]}</div><div class="lbl">${state.names[1]}</div></div>
+      </div>
+      <div class="beam-status">
+        ${pool ? `pool de este finde: ${pool} pts · objetivo ${(pool/2).toFixed(1)} c/u` : 'sin tareas asignadas todavía'}
+        ${t[0]+t[1] < pool ? ` · faltan ${pool-t[0]-t[1]} pts por asignar` : ''}
+      </div>
+    </div>
+
+    <div class="zone">
+      <div class="zone-head adentro"><span class="tag">Adentro</span><span class="zsum">${adentroSum} pts en juego</span></div>
+      ${adentroTasks.map(taskRow).join('')}
+    </div>
+    <div class="zone">
+      <div class="zone-head afuera"><span class="tag">Afuera</span><span class="zsum">${afueraSum} pts en juego</span></div>
+      ${afueraTasks.map(taskRow).join('')}
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="autoBtn">Repartir equilibrado</button>
+      <button class="btn btn-ghost" id="saveBtn">Guardar reparto de este finde</button>
+    </div>
+    <div class="status-line">"Repartir equilibrado" también mira el historial para compensar findes anteriores.</div>
+
+    <div class="history">
+      <h3>Historial</h3>
+      ${state.history.length ? `
+        <div class="cum">
+          <span style="color:var(--p0)">${state.names[0]}<b>${cum[0]}</b></span>
+          <span style="color:var(--p1)">${state.names[1]}<b>${cum[1]}</b></span>
+        </div>
+        ${state.history.map(h=>`
+          <div class="hist-row">
+            <span>${h.date} ${h.completa?'· completa':''}</span>
+            <span><b style="color:var(--p0)">${h.totals[0]}</b> / <b style="color:var(--p1)">${h.totals[1]}</b></span>
+          </div>`).join('')}
+      ` : `<p class="empty-hist">Todavía no guardaron ningún finde.</p>`}
+    </div>
+  `;
+
+  // listeners
+  document.getElementById('gearBtn').onclick = ()=>{ state.settingsOpen=!state.settingsOpen; render(); };
+  document.getElementById('completaSwitch').onchange = (e)=>{ state.isCompleta = e.target.checked; render(); };
+  document.getElementById('autoBtn').onclick = autoBalance;
+  document.getElementById('saveBtn').onclick = saveSession;
+  document.getElementById('name0').onchange = (e)=>{ state.names[0]=e.target.value||DEFAULT_NAMES[0]; persist(); render(); };
+  document.getElementById('name1').onchange = (e)=>{ state.names[1]=e.target.value||DEFAULT_NAMES[1]; persist(); render(); };
+
+  app.querySelectorAll('[data-weight]').forEach(inp=>{
+    inp.onchange = (e)=>{
+      const id = e.target.getAttribute('data-weight');
+      state.weights[id] = Math.max(0, Number(e.target.value)||0);
+      persist(); render();
+    };
+  });
+  app.querySelectorAll('.assign button').forEach(btn=>{
+    btn.onclick = ()=> setAssign(btn.getAttribute('data-task'), Number(btn.getAttribute('data-val')));
+  });
+}
+
+render();
+load();
+})();
+</script>
+</body>
+</html>
